@@ -15,6 +15,117 @@
           "path": ["health"]
         }
       }
+    },
+    {
+      "name": "Create Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{product_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"shippingAddress\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"New York\",\n    \"state\": \"NY\",\n    \"zipCode\": \"10001\",\n    \"country\": \"USA\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{order_base_url}}/api/orders",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders"]
+        }
+      }
+    },
+    {
+      "name": "List Orders",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/orders?page=1&limit=10",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Order by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/orders/{{order_id}}",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders", "{{order_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Cancel Order",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/orders/{{order_id}}/cancel",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "cancel"]
+        }
+      }
+    },
+    {
+      "name": "Update Order Status (Admin)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"confirmed\",\n  \"note\": \"Order confirmed and ready for processing\"\n}"
+        },
+        "url": {
+          "raw": "{{order_base_url}}/api/orders/{{order_id}}/status",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "status"]
+        }
+      }
     }
   ]
 }

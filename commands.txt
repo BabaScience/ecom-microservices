@@ -1,0 +1,13 @@
+Drop Documents
+
+- docker exec -it ecommerce-mongodb mongosh -u admin -p password --authenticationDatabase admin --eval "db.getSiblingDB('ecommerce_users').dropDatabase(); db.getSiblingDB('ecommerce_products').dropDatabase(); db.getSiblingDB('ecommerce_orders').dropDatabase();"
+
+
+Kill bun processes
+
+- Stop-Process -Name "bun" -Force
+
+
+Force Bun to use npm registry
+
+- bun install --registry https://registry.npmjs.org --verbose

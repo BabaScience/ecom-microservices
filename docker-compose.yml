@@ -22,6 +22,79 @@ services:
     networks:
       - ecommerce-network
 
+  # Application Services
+  api-gateway:
+    build: ./apps/api-gateway
+    container_name: ecommerce-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - GATEWAY_PORT=3000
+      - JWT_SECRET=your-development-secret-key
+      - JWT_EXPIRATION=24h
+      - USER_SERVICE_URL=http://user-service:3001
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - CORS_ORIGIN=*
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    networks:
+      - ecommerce-network
+
+  user-service:
+    build: ./apps/user-service
+    container_name: ecommerce-user-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - USER_SERVICE_PORT=3001
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/ecommerce_users?authSource=admin
+      - JWT_SECRET=your-development-secret-key
+      - JWT_EXPIRATION=24h
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+
+  product-service:
+    build: ./apps/product-service
+    container_name: ecommerce-product-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PRODUCT_SERVICE_PORT=3002
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/ecommerce_products?authSource=admin
+    depends_on:
+      - mongodb
+    networks:
+      - ecommerce-network
+
+  order-service:
+    build: ./apps/order-service
+    container_name: ecommerce-order-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - ORDER_SERVICE_PORT=3003
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/ecommerce_orders?authSource=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - USER_SERVICE_URL=http://user-service:3001
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+    depends_on:
+      - mongodb
+      - redis
+      - user-service
+      - product-service
+    networks:
+      - ecommerce-network
+
 volumes:
   mongodb_data:
 

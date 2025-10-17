@@ -15,6 +15,153 @@
           "path": ["health"]
         }
       }
+    },
+    {
+      "name": "List Products",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{product_base_url}}/api/products?page=1&limit=10&category=electronics",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "category",
+              "value": "electronics"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Product by ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{product_base_url}}/api/products/{{product_id}}",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products", "{{product_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Create Product (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"iPhone 15\",\n  \"description\": \"Latest iPhone with advanced features\",\n  \"sku\": \"IPHONE-15-001\",\n  \"price\": 999.99,\n  \"currency\": \"USD\",\n  \"inventory\": {\n    \"quantity\": 100\n  },\n  \"category\": \"electronics\",\n  \"images\": [\"https://example.com/iphone15.jpg\"],\n  \"specifications\": {\n    \"storage\": \"128GB\",\n    \"color\": \"Space Black\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{product_base_url}}/api/products",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products"]
+        }
+      }
+    },
+    {
+      "name": "Update Product (Admin)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"price\": 899.99,\n  \"inventory\": {\n    \"quantity\": 150\n  }\n}"
+        },
+        "url": {
+          "raw": "{{product_base_url}}/api/products/{{product_id}}",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products", "{{product_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Delete Product (Admin)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{product_base_url}}/api/products/{{product_id}}",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products", "{{product_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Reserve Inventory (Internal)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": 2\n}"
+        },
+        "url": {
+          "raw": "{{product_base_url}}/api/products/{{product_id}}/reserve",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products", "{{product_id}}", "reserve"]
+        }
+      }
+    },
+    {
+      "name": "Release Inventory (Internal)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"quantity\": 1\n}"
+        },
+        "url": {
+          "raw": "{{product_base_url}}/api/products/{{product_id}}/release",
+          "host": ["{{product_base_url}}"],
+          "path": ["api", "products", "{{product_id}}", "release"]
+        }
+      }
     }
   ]
 }
