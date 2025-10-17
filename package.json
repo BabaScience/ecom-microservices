@@ -1,0 +1,19 @@
+{
+  "name": "ecom-microservices",
+  "private": true,
+  "packageManager": "bun@1.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "clean": "turbo run clean && rm -rf node_modules .turbo"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.1",
+    "typescript": "^5.4.0"
+  }
+}
+

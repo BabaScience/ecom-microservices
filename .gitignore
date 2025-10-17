@@ -1,0 +1,23 @@
+# Node/Bun
+node_modules/
+.pnp.cjs
+.pnp.loader.mjs
+bun.lockb
+
+# Turbo
+.turbo/
+
+# Build outputs
+dist/
+build/
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+
