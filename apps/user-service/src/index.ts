@@ -1,6 +1,7 @@
 import express from 'express';
 import { correlationId, errorHandler, logger, connectToMongoDB } from '@repo/shared';
 import userRoutes from './routes/userRoutes';
+import { specs, swaggerUi } from './config/swagger';
 
 const app = express();
 const port = Number(process.env.USER_SERVICE_PORT) || 3001;
@@ -8,6 +9,9 @@ const port = Number(process.env.USER_SERVICE_PORT) || 3001;
 // Middleware
 app.use(express.json());
 app.use(correlationId);
+
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 // Connect to MongoDB
 const mongoUri = process.env.MONGODB_URI || 'mongodb://admin:password@localhost:27017/ecommerce_users?authSource=admin';

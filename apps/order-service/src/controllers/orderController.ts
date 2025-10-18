@@ -95,6 +95,7 @@ export const createOrder = async (req: Request, res: Response) => {
     const order = new Order({
       userId,
       items: orderItems,
+      orderNumber: orderItems[0].productId.toString(),
       subtotal,
       tax,
       shipping,
