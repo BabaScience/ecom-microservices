@@ -95,6 +95,24 @@ services:
     networks:
       - ecommerce-network
 
+  notification-service:
+    build: ./apps/notification-service
+    container_name: ecommerce-notification-service
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - NOTIFICATION_SERVICE_PORT=3004
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - RESEND_API_KEY=${RESEND_API_KEY:-re_xxxxxxxxxxxxxxxxxx}
+      - FROM_EMAIL=${FROM_EMAIL:-noreply@yourdomain.com}
+      - FROM_NAME=${FROM_NAME:-Ecommerce Platform}
+    depends_on:
+      - redis
+    networks:
+      - ecommerce-network
+
 volumes:
   mongodb_data:
 
