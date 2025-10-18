@@ -7,6 +7,7 @@ import { OutboxPublisher } from '../services/outboxPublisher';
 import { ok, error, logger, authMiddleware, adminMiddleware, eventPublisher, EventTypes, OrderCreatedData } from '@repo/shared';
 import { CreateOrderRequest, UpdateOrderStatusRequest } from '@repo/shared';
 import { enqueueOrderConfirmation } from '../queues/notificationQueue';
+import { sagaOrchestrator } from '../saga/sagaOrchestrator';
 
 const createOrderSchema = Joi.object({
   items: Joi.array().items(
@@ -25,14 +26,14 @@ const createOrderSchema = Joi.object({
 });
 
 const updateOrderStatusSchema = Joi.object({
-  status: Joi.string().valid('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled').required(),
+  status: Joi.string().valid('pending', 'payment_processing', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'failed').required(),
   note: Joi.string().optional()
 });
 
 const listOrdersSchema = Joi.object({
   page: Joi.number().min(1).default(1),
   limit: Joi.number().min(1).max(100).default(10),
-  status: Joi.string().valid('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled').optional()
+  status: Joi.string().valid('pending', 'payment_processing', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'failed').optional()
 });
 
 export const createOrder = async (req: Request, res: Response) => {
@@ -58,7 +59,7 @@ export const createOrder = async (req: Request, res: Response) => {
       return res.status(404).json(error('USER_NOT_FOUND', 'User not found'));
     }
 
-    // Validate products and reserve inventory
+    // Validate products and get product details (no inventory reservation here)
     const productServiceUrl = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
     const orderItems = [];
     let subtotal = 0;
@@ -73,24 +74,15 @@ export const createOrder = async (req: Request, res: Response) => {
 
       const product = productResponse.data.data.product;
 
-      // Reserve inventory
-      try {
-        await axios.post(`${productServiceUrl}/api/products/${item.productId}/reserve`, {
-          quantity: item.quantity
-        });
-      } catch (err) {
-        await session.abortTransaction();
-        return res.status(400).json(error('INSUFFICIENT_INVENTORY', `Not enough inventory for product ${product.name}`));
-      }
-
-      const itemTotal = product.price * item.quantity;
+      const itemTotal = product.price.amount * item.quantity;
       subtotal += itemTotal;
 
       orderItems.push({
         productId: product._id,
         productName: product.name,
+        sku: product.sku,
         quantity: item.quantity,
-        unitPrice: product.price,
+        unitPrice: product.price.amount,
         totalPrice: itemTotal
       });
     }
@@ -98,19 +90,29 @@ export const createOrder = async (req: Request, res: Response) => {
     // Calculate totals (simplified - no tax/shipping for now)
     const tax = 0;
     const shipping = 0;
-    const total = subtotal + tax + shipping;
+    const discount = 0;
+    const total = subtotal + tax + shipping - discount;
 
-    // Create order
+    // Create order with saga fields
     const order = new Order({
       userId,
       items: orderItems,
-      orderNumber: orderItems[0].productId.toString(),
-      subtotal,
-      tax,
-      shipping,
-      total,
+      pricing: {
+        subtotal,
+        tax,
+        shipping,
+        discount,
+        total
+      },
       shippingAddress: orderData.shippingAddress,
-      status: 'pending'
+      status: 'pending',
+      saga: {
+        id: crypto.randomUUID(),
+        status: 'in_progress',
+        currentStep: 'order_created',
+        completedSteps: [],
+        compensatedSteps: []
+      }
     });
 
     await order.save({ session });
@@ -119,15 +121,21 @@ export const createOrder = async (req: Request, res: Response) => {
     const orderCreatedData: OrderCreatedData = {
       orderNumber: order.orderNumber,
       userId: order.userId,
-      items: order.items,
-      total: order.total,
+      items: order.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice
+      })),
+      total: order.pricing.total,
       status: order.status,
       shippingAddress: order.shippingAddress
     };
 
     const orderCreatedEvent = eventPublisher.createEvent(
       EventTypes.ORDER_CREATED,
-      order._id.toString(),
+      (order._id as any).toString(),
       'Order',
       orderCreatedData,
       req.headers['x-correlation-id'] as string,
@@ -142,15 +150,23 @@ export const createOrder = async (req: Request, res: Response) => {
     // Commit transaction
     await session.commitTransaction();
 
+    // Start the saga orchestrator (async, outside transaction)
+    try {
+      await sagaOrchestrator.startOrderSaga((order._id as any).toString());
+    } catch (err) {
+      logger.error('Failed to start saga', { orderId: order._id, error: err });
+      // Don't fail the order creation if saga fails to start
+    }
+
     // Enqueue notification job (outside transaction)
     try {
       await enqueueOrderConfirmation({
-        orderId: order._id.toString(),
+        orderId: (order._id as any).toString(),
         userId: order.userId,
         email: userResponse.data.data.user.email,
         orderDetails: {
           orderNumber: order.orderNumber,
-          total: order.total,
+          total: order.pricing.total,
           items: order.items
         }
       });
@@ -161,7 +177,24 @@ export const createOrder = async (req: Request, res: Response) => {
 
     logger.info('Order created', { orderId: order._id, orderNumber: order.orderNumber });
 
-    res.status(201).json(ok({ order }));
+    res.status(201).json(ok({ 
+      order: {
+        _id: order._id,
+        orderNumber: order.orderNumber,
+        userId: order.userId,
+        items: order.items,
+        pricing: order.pricing,
+        status: order.status,
+        shippingAddress: order.shippingAddress,
+        saga: {
+          id: order.saga.id,
+          status: order.saga.status,
+          currentStep: order.saga.currentStep
+        },
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      }
+    }));
   } catch (err) {
     await session.abortTransaction();
     logger.error('Create order error', { error: err });
@@ -252,21 +285,26 @@ export const cancelOrder = async (req: Request, res: Response) => {
       return res.status(400).json(error('ORDER_CANNOT_BE_CANCELLED', 'Order cannot be cancelled at this stage'));
     }
 
-    // Release inventory
-    const productServiceUrl = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
-    for (const item of order.items) {
-      try {
-        await axios.post(`${productServiceUrl}/api/products/${item.productId}/release`, {
-          quantity: item.quantity
-        });
-      } catch (err) {
-        logger.warn('Failed to release inventory', { productId: item.productId, error: err });
-      }
-    }
-
-    // Update order status
+    // Update order status to cancelled
     order.status = 'cancelled';
+    order.saga.status = 'compensating';
     await order.save();
+
+    // Publish order cancelled event (this will trigger inventory release)
+    const orderCancelledEvent = eventPublisher.createEvent(
+      EventTypes.ORDER_CANCELLED,
+      (order._id as any).toString(),
+      'Order',
+      {
+        orderId: (order._id as any).toString(),
+        reason: 'User requested cancellation'
+      },
+      req.headers['x-correlation-id'] as string,
+      null,
+      userId
+    );
+
+    await eventPublisher.publishOrderEvent(orderCancelledEvent);
 
     logger.info('Order cancelled', { orderId: order._id });
 

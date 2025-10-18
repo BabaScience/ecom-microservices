@@ -24,7 +24,7 @@ export interface OrderConfirmationData {
 export interface OrderStatusUpdateData {
   orderId: string;
   email: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'payment_processing' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
   orderNumber: string;
   note?: string;
 }

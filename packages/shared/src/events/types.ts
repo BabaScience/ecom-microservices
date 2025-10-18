@@ -25,6 +25,7 @@ export enum EventTypes {
   ORDER_SHIPPED = 'order.shipped',
   ORDER_DELIVERED = 'order.delivered',
   ORDER_FAILED = 'order.failed',
+  ORDER_PAYMENT_PROCESSING = 'order.payment_processing',
   
   // User events
   USER_REGISTERED = 'user.registered',
@@ -90,6 +91,27 @@ export interface InventoryReservedData {
   }[];
 }
 
+export interface InventoryReleasedData {
+  orderId: string;
+  items: {
+    productId: string;
+    quantity: number;
+  }[];
+}
+
+export interface InventoryInsufficientData {
+  orderId: string;
+  failedItems: {
+    productId: string;
+    reason: string;
+  }[];
+}
+
+export interface OrderCancelledData {
+  orderId: string;
+  reason?: string;
+}
+
 // Notification types
 export interface OrderConfirmationData {
   orderId: string;
@@ -117,7 +139,7 @@ export interface OrderConfirmationData {
 export interface OrderStatusUpdateData {
   orderId: string;
   email: string;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'payment_processing' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'failed';
   orderNumber: string;
   note?: string;
 }

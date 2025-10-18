@@ -1,0 +1,29 @@
+{
+  "name": "@repo/inventory-service",
+  "version": "1.0.0",
+  "description": "Inventory Service - Consumer-only service for inventory management",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "start": "bun run dist/index.js",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@repo/shared": "workspace:*",
+    "express": "^4.18.2",
+    "ioredis": "^5.3.2",
+    "bullmq": "^5.0.0",
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.3.1",
+    "uuid": "^9.0.1",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "bun-types": "^1.0.0",
+    "typescript": "^5.3.0"
+  }
+}

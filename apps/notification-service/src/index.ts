@@ -36,13 +36,13 @@ app.get('/health', async (_req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    logger.error('Health check failed', { error: error.message });
+    logger.error('Health check failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(503).json({
       success: false,
       data: {
         status: 'unhealthy',
         service: 'notification-service',
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()
       }
     });
@@ -63,7 +63,7 @@ app.get('/metrics', async (_req, res) => {
       }
     });
   } catch (error) {
-    logger.error('Metrics endpoint failed', { error: error.message });
+    logger.error('Metrics endpoint failed', { error: error instanceof Error ? error.message : 'Unknown error' });
     res.status(500).json({
       success: false,
       error: {
