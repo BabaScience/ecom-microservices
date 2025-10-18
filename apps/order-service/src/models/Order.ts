@@ -143,7 +143,6 @@ orderSchema.pre('save', function(next) {
 
 // Indexes
 orderSchema.index({ userId: 1 });
-orderSchema.index({ orderNumber: 1 }, { unique: true });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ status: 1 });
 

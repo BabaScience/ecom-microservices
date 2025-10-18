@@ -126,7 +126,62 @@
           "path": ["api", "orders", "{{order_id}}", "status"]
         }
       }
+    },
+    {
+      "name": "Get Order Events (Debug)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/orders/{{order_id}}/events",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "orders", "{{order_id}}", "events"]
+        }
+      }
+    },
+    {
+      "name": "Get Outbox Events (Admin Debug)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/admin/outbox?limit=10",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "admin", "outbox"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Retry Failed Events (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{order_base_url}}/api/admin/outbox/retry",
+          "host": ["{{order_base_url}}"],
+          "path": ["api", "admin", "outbox", "retry"]
+        }
+      }
     }
-  ]
-}
 

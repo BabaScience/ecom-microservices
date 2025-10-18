@@ -1,28 +1,46 @@
-import { Queue, Worker } from 'bullmq';
-import { logger } from '@repo/shared';
-import { NotificationJob, JOB_TYPES } from '../types/notifications';
+import { Queue, Worker, QueueEvents } from 'bullmq';
+import { logger, redisConnection, idempotencyGuard, DomainEvent, EventTypes, NotificationJob, JOB_TYPES } from '@repo/shared';
 import { renderOrderConfirmationEmail, renderOrderStatusUpdateEmail } from '../services/templateService';
 import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '../services/emailService';
 
-// Create the queue
-const notificationQueue = new Queue('notifications', {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: Number(process.env.REDIS_PORT) || 6379
+// Create the queue with proper configuration
+const notificationQueue = new Queue('notification.tasks', {
+  connection: redisConnection,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000
+    },
+    removeOnComplete: true,
+    removeOnFail: 50        // Keep last 50 failures
   }
 });
 
-// Create the worker
-const worker = new Worker('notifications', async (job) => {
-  const { type, data } = job.data as NotificationJob;
+// Create the worker with best practices
+const worker = new Worker('notification.tasks', async (job) => {
+  const event = job.data as DomainEvent<NotificationJob>;
   
   logger.info('Processing notification job', { 
     jobId: job.id, 
-    type, 
-    orderId: data.orderId 
+    eventId: event.eventId,
+    eventType: event.eventType,
+    orderId: event.data.data.orderId 
   });
 
+  // Idempotency check
+  const processed = await idempotencyGuard.isProcessed(event.eventId);
+  if (processed) {
+    logger.info('Event already processed, skipping', { 
+      eventId: event.eventId,
+      jobId: job.id 
+    });
+    return { status: 'duplicate', eventId: event.eventId };
+  }
+
   try {
+    const { type, data } = event.data;
+    
     switch (type) {
       case JOB_TYPES.ORDER_CONFIRMATION:
         const confirmationTemplate = renderOrderConfirmationEmail(data);
@@ -48,70 +66,164 @@ const worker = new Worker('notifications', async (job) => {
         throw new Error(`Unknown job type: ${type}`);
     }
 
+    // Mark as processed
+    await idempotencyGuard.markAsProcessed(event.eventId, { status: 'success' });
+
     logger.info('Notification job completed successfully', { 
       jobId: job.id, 
+      eventId: event.eventId,
       type, 
-      orderId: data.orderId 
+      orderId: event.data.data.orderId 
     });
+
+    return { status: 'success', eventId: event.eventId };
 
   } catch (error) {
     logger.error('Notification job failed', { 
       jobId: job.id, 
-      type, 
-      orderId: data.orderId,
+      eventId: event.eventId,
+      type: event.data.type, 
+      orderId: event.data.data.orderId,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     throw error;
   }
 }, {
-  connection: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: Number(process.env.REDIS_PORT) || 6379
+  connection: redisConnection,
+  
+  // Concurrency - number of jobs processed in parallel
+  concurrency: 5,
+  
+  // Rate limiting
+  limiter: {
+    max: 100,          // Max 100 jobs
+    duration: 1000     // Per second
   },
-  concurrency: 3,
-  removeOnComplete: 10,
-  removeOnFail: 5
+  
+  // Automatic job locking - prevents duplicate processing
+  lockDuration: 30000, // 30 seconds
+  
+  // Stalled check interval
+  stalledInterval: 30000,
+  
+  // Metrics collection
+  metrics: {
+    maxDataPoints: 100
+  }
 });
 
-// Event handlers
-worker.on('completed', (job) => {
+// Queue events for monitoring
+const queueEvents = new QueueEvents('notification.tasks', {
+  connection: redisConnection
+});
+
+// Enhanced event handlers with metrics
+worker.on('completed', (job, result) => {
   logger.info('Job completed', { 
-    jobId: job?.id, 
-    type: job?.data?.type,
-    duration: job ? Date.now() - job.timestamp : 0
+    jobId: job.id, 
+    eventId: job.data?.eventId,
+    eventType: job.data?.eventType,
+    duration: Date.now() - job.timestamp,
+    result
   });
 });
 
-worker.on('failed', (job, err) => {
+worker.on('failed', (job, error) => {
   logger.error('Job failed', { 
     jobId: job?.id, 
-    type: job?.data?.type,
-    error: err.message,
-    attempts: job?.attemptsMade 
+    eventId: job?.data?.eventId,
+    eventType: job?.data?.eventType,
+    error: error.message,
+    attempts: job?.attemptsMade,
+    stack: error.stack
   });
-});
-
-worker.on('error', (err) => {
-  logger.error('Worker error', { error: err.message });
+  
+  // Send alert if critical job failed
+  if (job?.data?.metadata?.priority === 'critical') {
+    logger.error('Critical notification job failed', {
+      jobId: job.id,
+      eventId: job.data.eventId,
+      error: error.message
+    });
+  }
 });
 
 worker.on('stalled', (jobId) => {
   logger.warn('Job stalled', { jobId });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('Shutting down notification worker...');
-  await worker.close();
-  await notificationQueue.close();
-  process.exit(0);
+worker.on('error', (error) => {
+  logger.error('Worker error', { 
+    error: error.message,
+    stack: error.stack 
+  });
 });
 
-process.on('SIGINT', async () => {
-  logger.info('Shutting down notification worker...');
-  await worker.close();
-  await notificationQueue.close();
-  process.exit(0);
+// Queue event listeners
+queueEvents.on('waiting', ({ jobId }) => {
+  logger.debug('Job waiting', { jobId });
 });
+
+queueEvents.on('active', ({ jobId }) => {
+  logger.debug('Job active', { jobId });
+});
+
+queueEvents.on('progress', ({ jobId, data }) => {
+  logger.debug('Job progress', { jobId, progress: data });
+});
+
+// Graceful shutdown
+async function gracefulShutdown() {
+  logger.info('Shutting down notification worker gracefully...');
+  
+  try {
+    // Close worker (waits for active jobs to complete)
+    await worker.close();
+    
+    // Close queue
+    await notificationQueue.close();
+    
+    // Close queue events
+    await queueEvents.close();
+    
+    logger.info('Notification worker shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown', { error: error instanceof Error ? error.message : 'Unknown error' });
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+// Health check function
+export const getWorkerHealth = async () => {
+  try {
+    const [waiting, active, completed, failed] = await Promise.all([
+      notificationQueue.getWaitingCount(),
+      notificationQueue.getActiveCount(),
+      notificationQueue.getCompletedCount(),
+      notificationQueue.getFailedCount()
+    ]);
+    
+    return {
+      status: 'healthy',
+      queue: 'notification.tasks',
+      metrics: {
+        waiting,
+        active,
+        completed,
+        failed
+      },
+      redis: await redisConnection.ping() === 'PONG'
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
 
 export { notificationQueue, worker };

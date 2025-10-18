@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
 import Joi from 'joi';
 import axios from 'axios';
+import mongoose from 'mongoose';
 import { Order } from '../models/Order';
-import { ok, error, logger, authMiddleware, adminMiddleware } from '@repo/shared';
+import { OutboxPublisher } from '../services/outboxPublisher';
+import { ok, error, logger, authMiddleware, adminMiddleware, eventPublisher, EventTypes, OrderCreatedData } from '@repo/shared';
 import { CreateOrderRequest, UpdateOrderStatusRequest } from '@repo/shared';
 import { enqueueOrderConfirmation } from '../queues/notificationQueue';
 
@@ -34,9 +36,13 @@ const listOrdersSchema = Joi.object({
 });
 
 export const createOrder = async (req: Request, res: Response) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  
   try {
     const { error: validationError } = createOrderSchema.validate(req.body);
     if (validationError) {
+      await session.abortTransaction();
       return res.status(400).json(error('VALIDATION_ERROR', validationError.details[0].message));
     }
 
@@ -48,6 +54,7 @@ export const createOrder = async (req: Request, res: Response) => {
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
     const userResponse = await axios.get(`${userServiceUrl}/api/users/${userId}`);
     if (!userResponse.data.success) {
+      await session.abortTransaction();
       return res.status(404).json(error('USER_NOT_FOUND', 'User not found'));
     }
 
@@ -60,6 +67,7 @@ export const createOrder = async (req: Request, res: Response) => {
       // Get product details
       const productResponse = await axios.get(`${productServiceUrl}/api/products/${item.productId}`);
       if (!productResponse.data.success) {
+        await session.abortTransaction();
         return res.status(404).json(error('PRODUCT_NOT_FOUND', `Product ${item.productId} not found`));
       }
 
@@ -71,6 +79,7 @@ export const createOrder = async (req: Request, res: Response) => {
           quantity: item.quantity
         });
       } catch (err) {
+        await session.abortTransaction();
         return res.status(400).json(error('INSUFFICIENT_INVENTORY', `Not enough inventory for product ${product.name}`));
       }
 
@@ -104,9 +113,36 @@ export const createOrder = async (req: Request, res: Response) => {
       status: 'pending'
     });
 
-    await order.save();
+    await order.save({ session });
 
-    // Enqueue notification job
+    // Create order created event
+    const orderCreatedData: OrderCreatedData = {
+      orderNumber: order.orderNumber,
+      userId: order.userId,
+      items: order.items,
+      total: order.total,
+      status: order.status,
+      shippingAddress: order.shippingAddress
+    };
+
+    const orderCreatedEvent = eventPublisher.createEvent(
+      EventTypes.ORDER_CREATED,
+      order._id.toString(),
+      'Order',
+      orderCreatedData,
+      req.headers['x-correlation-id'] as string,
+      null,
+      userId
+    );
+
+    // Save event to outbox (within same transaction)
+    const outboxPublisher = new OutboxPublisher(null as any); // We'll initialize this properly
+    await outboxPublisher.saveEvent(session, orderCreatedEvent);
+
+    // Commit transaction
+    await session.commitTransaction();
+
+    // Enqueue notification job (outside transaction)
     try {
       await enqueueOrderConfirmation({
         orderId: order._id.toString(),
@@ -127,8 +163,11 @@ export const createOrder = async (req: Request, res: Response) => {
 
     res.status(201).json(ok({ order }));
   } catch (err) {
+    await session.abortTransaction();
     logger.error('Create order error', { error: err });
     res.status(500).json(error('INTERNAL_ERROR', 'Failed to create order'));
+  } finally {
+    session.endSession();
   }
 };
 

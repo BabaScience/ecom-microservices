@@ -1,0 +1,373 @@
+{
+  "info": {
+    "name": "Event-Driven Architecture Tests",
+    "description": "Collection to test the event-driven microservices architecture with BullMQ, transactional outbox, and idempotency features",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Infrastructure Health Checks",
+      "item": [
+        {
+          "name": "Gateway Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_base_url}}/health",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "User Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{user_base_url}}/health",
+              "host": ["{{user_base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Product Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{product_base_url}}/health",
+              "host": ["{{product_base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Order Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{order_base_url}}/health",
+              "host": ["{{order_base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Notification Service Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notification_base_url}}/health",
+              "host": ["{{notification_base_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Notification Queue Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notification_base_url}}/metrics",
+              "host": ["{{notification_base_url}}"],
+              "path": ["metrics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. User Registration & Authentication",
+      "item": [
+        {
+          "name": "Register Test User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_base_url}}/api/users/register",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "users", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Test User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_base_url}}/api/users/login",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "users", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Product Management",
+      "item": [
+        {
+          "name": "Create Test Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Event-Driven Test Product\",\n  \"description\": \"A product to test event-driven architecture\",\n  \"sku\": \"EVENT-TEST-001\",\n  \"price\": 99.99,\n  \"currency\": \"USD\",\n  \"inventory\": {\n    \"quantity\": 50\n  },\n  \"category\": \"electronics\",\n  \"images\": [\"https://example.com/test-product.jpg\"],\n  \"specifications\": {\n    \"type\": \"Test Product\",\n    \"color\": \"Blue\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{product_base_url}}/api/products",
+              "host": ["{{product_base_url}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{gateway_base_url}}/api/products?page=1&limit=10",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Event-Driven Order Flow",
+      "item": [
+        {
+          "name": "Create Order (Triggers Events)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{product_id}}\",\n      \"quantity\": 2\n    }\n  ],\n  \"shippingAddress\": {\n    \"street\": \"123 Event Test St\",\n    \"city\": \"Event City\",\n    \"state\": \"EC\",\n    \"zipCode\": \"12345\",\n    \"country\": \"USA\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_base_url}}/api/orders",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Check Order Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{gateway_base_url}}/api/orders/{{order_id}}",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Order Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmed\",\n  \"note\": \"Order confirmed and ready for processing\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_base_url}}/api/orders/{{order_id}}/status",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "orders", "{{order_id}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Event Monitoring & Debugging",
+      "item": [
+        {
+          "name": "Check Notification Queue Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{notification_base_url}}/metrics",
+              "host": ["{{notification_base_url}}"],
+              "path": ["metrics"]
+            }
+          }
+        },
+        {
+          "name": "Get Outbox Events (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{order_base_url}}/api/admin/outbox?limit=10",
+              "host": ["{{order_base_url}}"],
+              "path": ["api", "admin", "outbox"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Test Notification Service Directly",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"order-confirmation\",\n  \"data\": {\n    \"orderId\": \"{{order_id}}\",\n    \"userId\": \"{{user_id}}\",\n    \"email\": \"testuser@example.com\",\n    \"orderDetails\": {\n      \"orderNumber\": \"ORD-{{order_id}}\",\n      \"total\": 199.98,\n      \"items\": [\n        {\n          \"productName\": \"Event-Driven Test Product\",\n          \"quantity\": 2,\n          \"unitPrice\": 99.99,\n          \"totalPrice\": 199.98\n        }\n      ],\n      \"shippingAddress\": {\n        \"street\": \"123 Event Test St\",\n        \"city\": \"Event City\",\n        \"state\": \"EC\",\n        \"zipCode\": \"12345\",\n        \"country\": \"USA\"\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{notification_base_url}}/api/notifications/send",
+              "host": ["{{notification_base_url}}"],
+              "path": ["api", "notifications", "send"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Idempotency Testing",
+      "item": [
+        {
+          "name": "Create Duplicate Order (Test Idempotency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "test-order-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": \"{{product_id}}\",\n      \"quantity\": 1\n    }\n  ],\n  \"shippingAddress\": {\n    \"street\": \"456 Idempotency St\",\n    \"city\": \"Test City\",\n    \"state\": \"TC\",\n    \"zipCode\": \"54321\",\n    \"country\": \"USA\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{gateway_base_url}}/api/orders",
+              "host": ["{{gateway_base_url}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Send Same Notification Twice (Test Idempotency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "test-notification-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"order-status-update\",\n  \"data\": {\n    \"orderId\": \"{{order_id}}\",\n    \"email\": \"testuser@example.com\",\n    \"status\": \"shipped\",\n    \"orderNumber\": \"ORD-{{order_id}}\",\n    \"note\": \"Your order has been shipped!\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{notification_base_url}}/api/notifications/send",
+              "host": ["{{notification_base_url}}"],
+              "path": ["api", "notifications", "send"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

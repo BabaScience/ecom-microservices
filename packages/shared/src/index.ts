@@ -11,3 +11,9 @@ export * from './middleware/correlationId';
 export * from './middleware/auth';
 export * from './middleware/validation';
 
+// Event-driven architecture exports
+export * from './config/redis';
+export * from './events/types';
+export * from './events/publisher';
+export * from './events/idempotency';
+

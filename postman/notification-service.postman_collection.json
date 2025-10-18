@@ -1,0 +1,74 @@
+{
+  "info": {
+    "name": "Notification Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{notification_base_url}}/health",
+          "host": ["{{notification_base_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Queue Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{notification_base_url}}/metrics",
+          "host": ["{{notification_base_url}}"],
+          "path": ["metrics"]
+        }
+      }
+    },
+    {
+      "name": "Send Test Email",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"order-confirmation\",\n  \"data\": {\n    \"orderId\": \"{{order_id}}\",\n    \"userId\": \"{{user_id}}\",\n    \"email\": \"test@example.com\",\n    \"orderDetails\": {\n      \"orderNumber\": \"ORD-001\",\n      \"total\": 199.99,\n      \"items\": [\n        {\n          \"productName\": \"Test Product\",\n          \"quantity\": 1,\n          \"unitPrice\": 199.99,\n          \"totalPrice\": 199.99\n        }\n      ],\n      \"shippingAddress\": {\n        \"street\": \"123 Test St\",\n        \"city\": \"Test City\",\n        \"state\": \"TS\",\n        \"zipCode\": \"12345\",\n        \"country\": \"USA\"\n      }\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{notification_base_url}}/api/notifications/send",
+          "host": ["{{notification_base_url}}"],
+          "path": ["api", "notifications", "send"]
+        }
+      }
+    },
+    {
+      "name": "Send Order Status Update",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"order-status-update\",\n  \"data\": {\n    \"orderId\": \"{{order_id}}\",\n    \"email\": \"test@example.com\",\n    \"status\": \"shipped\",\n    \"orderNumber\": \"ORD-001\",\n    \"note\": \"Your order has been shipped and is on its way!\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{notification_base_url}}/api/notifications/send",
+          "host": ["{{notification_base_url}}"],
+          "path": ["api", "notifications", "send"]
+        }
+      }
+    }
+  ]
+}

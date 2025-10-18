@@ -1,6 +1,6 @@
 import express from 'express';
-import { correlationId, errorHandler, logger } from '@repo/shared';
-import { notificationQueue, worker } from './workers/notificationWorker';
+import { correlationId, errorHandler, logger, checkRedisHealth } from '@repo/shared';
+import { notificationQueue, worker, getWorkerHealth } from './workers/notificationWorker';
 
 const app = express();
 const port = Number(process.env.NOTIFICATION_SERVICE_PORT) || 3004;
@@ -9,22 +9,69 @@ const port = Number(process.env.NOTIFICATION_SERVICE_PORT) || 3004;
 app.use(express.json());
 app.use(correlationId);
 
-// Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({
-    success: true,
-    data: {
-      status: 'healthy',
-      service: 'notification-service',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      worker: {
-        isRunning: worker.isRunning(),
-        concurrency: worker.opts.concurrency
+// Enhanced health check endpoint
+app.get('/health', async (_req, res) => {
+  try {
+    const workerHealth = await getWorkerHealth();
+    const redisHealth = await checkRedisHealth();
+    
+    const healthStatus = workerHealth.status === 'healthy' && redisHealth ? 'healthy' : 'unhealthy';
+    
+    res.status(healthStatus === 'healthy' ? 200 : 503).json({
+      success: healthStatus === 'healthy',
+      data: {
+        status: healthStatus,
+        service: 'notification-service',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        redis: {
+          connected: redisHealth
+        },
+        worker: {
+          isRunning: worker.isRunning(),
+          concurrency: worker.opts.concurrency,
+          ...workerHealth.metrics
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    logger.error('Health check failed', { error: error.message });
+    res.status(503).json({
+      success: false,
+      data: {
+        status: 'unhealthy',
+        service: 'notification-service',
+        error: error.message,
+        timestamp: new Date().toISOString()
       }
-    },
-    timestamp: new Date().toISOString()
-  });
+    });
+  }
+});
+
+// Queue metrics endpoint
+app.get('/metrics', async (_req, res) => {
+  try {
+    const workerHealth = await getWorkerHealth();
+    
+    res.json({
+      success: true,
+      data: {
+        queue: 'notification.tasks',
+        metrics: workerHealth.metrics,
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    logger.error('Metrics endpoint failed', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'METRICS_ERROR',
+        message: 'Failed to retrieve metrics'
+      }
+    });
+  }
 });
 
 // Optional: Manual notification trigger endpoint (for testing)
