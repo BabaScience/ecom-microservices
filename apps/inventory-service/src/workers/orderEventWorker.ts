@@ -1,4 +1,4 @@
-import { Worker, QueueEvents } from 'bullmq';
+import { Queue, Worker, QueueEvents } from 'bullmq';
 import { logger, redisConnection, idempotencyGuard, DomainEvent, EventTypes, OrderCreatedData, OrderCancelledData } from '@repo/shared';
 import { inventoryService } from '../services/inventoryService';
 

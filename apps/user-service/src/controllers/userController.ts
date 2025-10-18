@@ -3,6 +3,7 @@ import Joi from 'joi';
 import { User } from '../models/User';
 import { generateToken, ok, error, logger } from '@repo/shared';
 import { RegisterRequest, LoginRequest, UpdateProfileRequest } from '@repo/shared';
+import { UserEventPublisher } from '../events/publisher';
 
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
@@ -53,9 +54,28 @@ export const register = async (req: Request, res: Response) => {
 
     await user.save();
 
+    // Publish user registered event
+    try {
+      await UserEventPublisher.publishUserRegistered(
+        (user._id as any).toString(),
+        {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish user registered event', { 
+        userId: user._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail registration if event publishing fails
+    }
+
     // Generate JWT token
     const token = generateToken(
-      { userId: user._id.toString(), email: user.email, role: user.role },
+      { userId: (user._id as any).toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       process.env.JWT_EXPIRATION || '24h'
     );
@@ -102,7 +122,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = generateToken(
-      { userId: user._id.toString(), email: user.email, role: user.role },
+      { userId: (user._id as any).toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       process.env.JWT_EXPIRATION || '24h'
     );
@@ -175,6 +195,21 @@ export const updateProfile = async (req: Request, res: Response) => {
       return res.status(404).json(error('USER_NOT_FOUND', 'User not found'));
     }
 
+    // Publish user updated event
+    try {
+      await UserEventPublisher.publishUserUpdated(
+        (updatedUser._id as any).toString(),
+        updates,
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish user updated event', { 
+        userId: updatedUser._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail profile update if event publishing fails
+    }
+
     logger.info('Profile updated', { userId: updatedUser._id });
 
     res.json(ok({
@@ -226,9 +261,28 @@ export const createAdminUser = async (req: Request, res: Response) => {
 
     await user.save();
 
+    // Publish user registered event (admin users are also registered)
+    try {
+      await UserEventPublisher.publishUserRegistered(
+        (user._id as any).toString(),
+        {
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
+        },
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish user registered event', { 
+        userId: user._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail admin creation if event publishing fails
+    }
+
     // Generate JWT token
     const token = generateToken(
-      { userId: user._id.toString(), email: user.email, role: user.role },
+      { userId: (user._id as any).toString(), email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       process.env.JWT_EXPIRATION || '24h'
     );
@@ -294,6 +348,21 @@ export const updateUserRole = async (req: Request, res: Response) => {
 
     if (!user) {
       return res.status(404).json(error('USER_NOT_FOUND', 'User not found'));
+    }
+
+    // Publish user updated event for role change
+    try {
+      await UserEventPublisher.publishUserUpdated(
+        (user._id as any).toString(),
+        { role },
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish user updated event', { 
+        userId: user._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail role update if event publishing fails
     }
 
     logger.info('User role updated', { userId: user._id, newRole: role });

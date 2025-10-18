@@ -121,7 +121,6 @@ services:
 
   inventory-service:
     build: ./apps/inventory-service
-    container_name: ecommerce-inventory-service
     ports:
       - "3005:3005"
     environment:
@@ -171,7 +170,6 @@ services:
 
   notification-service:
     build: ./apps/notification-service
-    container_name: ecommerce-notification-service
     ports:
       - "3004:3004"
     environment:

@@ -1,6 +1,7 @@
 import express from 'express';
 import { correlationId, errorHandler, logger, checkRedisHealth } from '@repo/shared';
 import { notificationQueue, worker, getWorkerHealth } from './workers/notificationWorker';
+import { userEventsWorker } from './workers/userEventWorker';
 
 const app = express();
 const port = Number(process.env.NOTIFICATION_SERVICE_PORT) || 3004;
@@ -136,12 +137,23 @@ app.listen(port, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+async function gracefulShutdown() {
   logger.info('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
+  
+  try {
+    // Close workers
+    await worker.close();
+    await userEventsWorker.close();
+    
+    logger.info('Notification Service shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown', { 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
+    process.exit(1);
+  }
+}
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

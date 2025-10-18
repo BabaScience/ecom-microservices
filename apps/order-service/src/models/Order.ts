@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import crypto from 'crypto';
 
 export interface IOrder extends Document {
   orderNumber: string;
@@ -137,14 +138,12 @@ const orderSchema = new Schema<IOrder>({
   saga: {
     id: {
       type: String,
-      required: true,
-      index: true
+      required: true
     },
     status: {
       type: String,
       enum: ['in_progress', 'completed', 'compensating', 'failed'],
-      default: 'in_progress',
-      index: true
+      default: 'in_progress'
     },
     currentStep: {
       type: String,
@@ -172,15 +171,21 @@ const orderSchema = new Schema<IOrder>({
 
 // Pre-save hook to generate order number and saga ID
 orderSchema.pre('save', function(next) {
+  console.log('Pre-save hook running, isNew:', this.isNew);
+  
   if (this.isNew) {
+    console.log('Document is new, generating orderNumber and saga.id');
+    
     if (!this.orderNumber) {
       const timestamp = Date.now().toString().slice(-6);
       const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
       this.orderNumber = `ORD-${timestamp}-${random}`;
+      console.log('Generated orderNumber:', this.orderNumber);
     }
     
     if (!this.saga.id) {
       this.saga.id = crypto.randomUUID();
+      console.log('Generated saga.id:', this.saga.id);
     }
     
     // Initialize saga state

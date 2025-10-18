@@ -158,3 +158,85 @@ Thank you for choosing our service!
   return { subject, html, text };
 }
 
+export function renderWelcomeEmail(data: { userId: string; email: string; firstName: string; lastName: string }): EmailTemplate {
+  const { firstName, lastName } = data;
+  
+  const subject = `Welcome to our E-commerce Platform!`;
+  
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Welcome!</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4A90E2; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .welcome { background-color: white; padding: 20px; margin: 15px 0; border-radius: 5px; text-align: center; }
+        .features { background-color: #f0f8ff; padding: 15px; border-radius: 5px; }
+        .cta { background-color: #4A90E2; color: white; padding: 15px; border-radius: 5px; text-align: center; }
+        .cta a { color: white; text-decoration: none; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to Our Platform!</h1>
+        </div>
+        <div class="content">
+          <div class="welcome">
+            <h2>Hello ${firstName} ${lastName}!</h2>
+            <p>Thank you for joining our e-commerce platform. We're excited to have you as part of our community!</p>
+          </div>
+          
+          <div class="features">
+            <h3>What you can do:</h3>
+            <ul>
+              <li>Browse our extensive product catalog</li>
+              <li>Create and manage your orders</li>
+              <li>Track your shipments in real-time</li>
+              <li>Manage your profile and preferences</li>
+              <li>Get exclusive member discounts</li>
+            </ul>
+          </div>
+          
+          <div class="cta">
+            <h3>Ready to start shopping?</h3>
+            <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/products">Browse Products</a></p>
+          </div>
+          
+          <p>If you have any questions, feel free to contact our support team.</p>
+          <p>Happy shopping!</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  const text = `
+Welcome to Our Platform!
+
+Hello ${firstName} ${lastName}!
+
+Thank you for joining our e-commerce platform. We're excited to have you as part of our community!
+
+What you can do:
+- Browse our extensive product catalog
+- Create and manage your orders
+- Track your shipments in real-time
+- Manage your profile and preferences
+- Get exclusive member discounts
+
+Ready to start shopping?
+Visit: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/products
+
+If you have any questions, feel free to contact our support team.
+
+Happy shopping!
+  `;
+  
+  return { subject, html, text };
+}
+

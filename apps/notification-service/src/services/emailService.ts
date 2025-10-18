@@ -59,3 +59,12 @@ export async function sendOrderStatusUpdateEmail(data: {
   return sendEmail(data);
 }
 
+export async function sendWelcomeEmail(data: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<string> {
+  return sendEmail(data);
+}
+

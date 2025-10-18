@@ -49,6 +49,21 @@ const worker = new Worker('notification.tasks', async (job) => {
       case 'order-status-update':
         return await handleOrderStatusUpdate(event.data.data as OrderStatusUpdateData);
       
+      case 'welcome-email':
+        return await handleWelcomeEmail(event.data.data as { userId: string; email: string; firstName: string; lastName: string });
+      
+      case 'profile-update-email':
+        logger.info('Profile update email not yet implemented', { userId: event.data.data.userId });
+        return { status: 'ignored', jobType: event.data.type };
+      
+      case 'account-deletion-email':
+        logger.info('Account deletion email not yet implemented', { userId: event.data.data.userId });
+        return { status: 'ignored', jobType: event.data.type };
+      
+      case 'password-reset-email':
+        logger.info('Password reset email not yet implemented', { userId: event.data.data.userId });
+        return { status: 'ignored', jobType: event.data.type };
+      
       default:
         logger.info('Ignoring notification job type', { jobType: event.data.type });
         return { status: 'ignored', jobType: event.data.type };
@@ -124,6 +139,31 @@ async function handleOrderStatusUpdate(data: OrderStatusUpdateData) {
   });
   
   return { status: 'success', orderId, email, status };
+}
+
+async function handleWelcomeEmail(data: { userId: string; email: string; firstName: string; lastName: string }) {
+  const { userId, email, firstName, lastName } = data;
+  
+  logger.info('Handling welcome email', { userId, email, firstName, lastName });
+  
+  const template: EmailTemplate = {
+    subject: `Welcome to our E-commerce Platform!`,
+    html: generateWelcomeEmailHTML({ firstName, lastName }),
+    text: generateWelcomeEmailText({ firstName, lastName })
+  };
+  
+  await sendGridService.sendEmail({
+    to: email,
+    template,
+    data: { firstName, lastName }
+  });
+  
+  // Mark as processed
+  await idempotencyGuard.markAsProcessed(crypto.randomUUID(), { 
+    status: 'success' 
+  });
+  
+  return { status: 'success', userId, email };
 }
 
 function generateOrderConfirmationHTML(orderDetails: any): string {
@@ -223,6 +263,84 @@ Status: ${data.status}
 ${data.note ? `Note: ${data.note}` : ''}
 
 Thank you for your patience!
+  `;
+}
+
+function generateWelcomeEmailHTML(data: { firstName: string; lastName: string }): string {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Welcome!</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #4A90E2; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .welcome { background-color: white; padding: 20px; margin: 15px 0; border-radius: 5px; text-align: center; }
+        .features { background-color: #f0f8ff; padding: 15px; border-radius: 5px; }
+        .cta { background-color: #4A90E2; color: white; padding: 15px; border-radius: 5px; text-align: center; }
+        .cta a { color: white; text-decoration: none; font-weight: bold; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Welcome to Our Platform!</h1>
+        </div>
+        <div class="content">
+          <div class="welcome">
+            <h2>Hello ${data.firstName} ${data.lastName}!</h2>
+            <p>Thank you for joining our e-commerce platform. We're excited to have you as part of our community!</p>
+          </div>
+          
+          <div class="features">
+            <h3>What you can do:</h3>
+            <ul>
+              <li>Browse our extensive product catalog</li>
+              <li>Create and manage your orders</li>
+              <li>Track your shipments in real-time</li>
+              <li>Manage your profile and preferences</li>
+              <li>Get exclusive member discounts</li>
+            </ul>
+          </div>
+          
+          <div class="cta">
+            <h3>Ready to start shopping?</h3>
+            <p><a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/products">Browse Products</a></p>
+          </div>
+          
+          <p>If you have any questions, feel free to contact our support team.</p>
+          <p>Happy shopping!</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+function generateWelcomeEmailText(data: { firstName: string; lastName: string }): string {
+  return `
+Welcome to Our Platform!
+
+Hello ${data.firstName} ${data.lastName}!
+
+Thank you for joining our e-commerce platform. We're excited to have you as part of our community!
+
+What you can do:
+- Browse our extensive product catalog
+- Create and manage your orders
+- Track your shipments in real-time
+- Manage your profile and preferences
+- Get exclusive member discounts
+
+Ready to start shopping?
+Visit: ${process.env.FRONTEND_URL || 'http://localhost:3000'}/products
+
+If you have any questions, feel free to contact our support team.
+
+Happy shopping!
   `;
 }
 

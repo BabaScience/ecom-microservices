@@ -16,4 +16,6 @@ export * from './config/redis';
 export * from './events/types';
 export * from './events/publisher';
 export * from './events/idempotency';
+export * from './events/dlq';
+export * from './events/queueConfigs';
 

@@ -146,11 +146,19 @@ export interface OrderStatusUpdateData {
 
 export type NotificationJob = 
   | { type: 'order-confirmation'; data: OrderConfirmationData }
-  | { type: 'order-status-update'; data: OrderStatusUpdateData };
+  | { type: 'order-status-update'; data: OrderStatusUpdateData }
+  | { type: 'welcome-email'; data: { userId: string; email: string; firstName: string; lastName: string } }
+  | { type: 'profile-update-email'; data: { userId: string; email: string; updatedFields: Record<string, any> } }
+  | { type: 'account-deletion-email'; data: { userId: string; email: string; deletionDate: string } }
+  | { type: 'password-reset-email'; data: { userId: string; email: string; resetToken: string; resetUrl: string } };
 
 export const JOB_TYPES = {
   ORDER_CONFIRMATION: 'order-confirmation',
-  ORDER_STATUS_UPDATE: 'order-status-update'
+  ORDER_STATUS_UPDATE: 'order-status-update',
+  WELCOME_EMAIL: 'welcome-email',
+  PROFILE_UPDATE_EMAIL: 'profile-update-email',
+  ACCOUNT_DELETION_EMAIL: 'account-deletion-email',
+  PASSWORD_RESET_EMAIL: 'password-reset-email'
 } as const;
 
 export interface EmailTemplate {

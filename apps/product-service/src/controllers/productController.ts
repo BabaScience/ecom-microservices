@@ -3,6 +3,7 @@ import Joi from 'joi';
 import { Product } from '../models/Product';
 import { ok, error, logger, authMiddleware, adminMiddleware } from '@repo/shared';
 import { CreateProductRequest, UpdateProductRequest, ReserveInventoryRequest } from '@repo/shared';
+import { ProductEventPublisher } from '../events/publisher';
 
 const createProductSchema = Joi.object({
   name: Joi.string().required(),
@@ -134,6 +135,27 @@ export const createProduct = async (req: Request, res: Response) => {
 
     await product.save();
 
+    // Publish product created event
+    try {
+      await ProductEventPublisher.publishProductCreated(
+        product._id.toString(),
+        {
+          name: product.name,
+          sku: product.sku,
+          price: product.price.amount,
+          category: product.category,
+          inventory: { quantity: product.inventory.quantity }
+        },
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish product created event', { 
+        productId: product._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail product creation if event publishing fails
+    }
+
     logger.info('Product created', { productId: product._id, sku: product.sku });
 
     res.status(201).json(ok({ product }));
@@ -163,6 +185,21 @@ export const updateProduct = async (req: Request, res: Response) => {
       return res.status(404).json(error('PRODUCT_NOT_FOUND', 'Product not found'));
     }
 
+    // Publish product updated event
+    try {
+      await ProductEventPublisher.publishProductUpdated(
+        product._id.toString(),
+        updates,
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish product updated event', { 
+        productId: product._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail product update if event publishing fails
+    }
+
     logger.info('Product updated', { productId: product._id });
 
     res.json(ok({ product }));
@@ -186,6 +223,20 @@ export const deleteProduct = async (req: Request, res: Response) => {
       return res.status(404).json(error('PRODUCT_NOT_FOUND', 'Product not found'));
     }
 
+    // Publish product deleted event
+    try {
+      await ProductEventPublisher.publishProductDeleted(
+        product._id.toString(),
+        req.headers['x-correlation-id'] as string
+      );
+    } catch (eventError) {
+      logger.warn('Failed to publish product deleted event', { 
+        productId: product._id, 
+        error: eventError instanceof Error ? eventError.message : 'Unknown error' 
+      });
+      // Don't fail product deletion if event publishing fails
+    }
+
     logger.info('Product deleted (soft)', { productId: product._id });
 
     res.json(ok({ message: 'Product deleted successfully' }));
@@ -195,71 +246,28 @@ export const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
+// DEPRECATED: These endpoints are deprecated in favor of Inventory Service
+// Inventory management is now handled by the Inventory Service via events
 export const reserveInventory = async (req: Request, res: Response) => {
-  try {
-    const { error: validationError } = reserveInventorySchema.validate(req.body);
-    if (validationError) {
-      return res.status(400).json(error('VALIDATION_ERROR', validationError.details[0].message));
-    }
-
-    const { id } = req.params;
-    const { quantity }: ReserveInventoryRequest = req.body;
-
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json(error('PRODUCT_NOT_FOUND', 'Product not found'));
-    }
-
-    const available = product.inventory.quantity - product.inventory.reserved;
-    if (available < quantity) {
-      return res.status(400).json(error('INSUFFICIENT_INVENTORY', 'Not enough inventory available'));
-    }
-
-    product.inventory.reserved += quantity;
-    await product.save();
-
-    logger.info('Inventory reserved', { productId: product._id, quantity });
-
-    res.json(ok({
-      message: 'Inventory reserved successfully',
-      available: product.inventory.quantity - product.inventory.reserved
-    }));
-  } catch (err) {
-    logger.error('Reserve inventory error', { error: err });
-    res.status(500).json(error('INTERNAL_ERROR', 'Failed to reserve inventory'));
-  }
+  logger.warn('Deprecated endpoint called: reserveInventory', { 
+    productId: req.params.id,
+    ip: req.ip 
+  });
+  
+  res.status(410).json(error(
+    'ENDPOINT_DEPRECATED', 
+    'This endpoint is deprecated. Inventory management is now handled by the Inventory Service.'
+  ));
 };
 
 export const releaseInventory = async (req: Request, res: Response) => {
-  try {
-    const { error: validationError } = reserveInventorySchema.validate(req.body);
-    if (validationError) {
-      return res.status(400).json(error('VALIDATION_ERROR', validationError.details[0].message));
-    }
-
-    const { id } = req.params;
-    const { quantity }: ReserveInventoryRequest = req.body;
-
-    const product = await Product.findById(id);
-    if (!product) {
-      return res.status(404).json(error('PRODUCT_NOT_FOUND', 'Product not found'));
-    }
-
-    if (product.inventory.reserved < quantity) {
-      return res.status(400).json(error('INVALID_RELEASE', 'Cannot release more than reserved'));
-    }
-
-    product.inventory.reserved -= quantity;
-    await product.save();
-
-    logger.info('Inventory released', { productId: product._id, quantity });
-
-    res.json(ok({
-      message: 'Inventory released successfully',
-      available: product.inventory.quantity - product.inventory.reserved
-    }));
-  } catch (err) {
-    logger.error('Release inventory error', { error: err });
-    res.status(500).json(error('INTERNAL_ERROR', 'Failed to release inventory'));
-  }
+  logger.warn('Deprecated endpoint called: releaseInventory', { 
+    productId: req.params.id,
+    ip: req.ip 
+  });
+  
+  res.status(410).json(error(
+    'ENDPOINT_DEPRECATED', 
+    'This endpoint is deprecated. Inventory management is now handled by the Inventory Service.'
+  ));
 };

@@ -1,7 +1,7 @@
 import { Queue, Worker, QueueEvents } from 'bullmq';
-import { logger, redisConnection, idempotencyGuard, DomainEvent, EventTypes, NotificationJob, JOB_TYPES } from '@repo/shared';
-import { renderOrderConfirmationEmail, renderOrderStatusUpdateEmail } from '../services/templateService';
-import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail } from '../services/emailService';
+import { logger, redisConnection, idempotencyGuard, DomainEvent, EventTypes, NotificationJob, JOB_TYPES, DLQPublisher } from '@repo/shared';
+import { renderOrderConfirmationEmail, renderOrderStatusUpdateEmail, renderWelcomeEmail } from '../services/templateService';
+import { sendOrderConfirmationEmail, sendOrderStatusUpdateEmail, sendWelcomeEmail } from '../services/emailService';
 
 // Create the queue with proper configuration
 const notificationQueue = new Queue('notification.tasks', {
@@ -60,6 +60,31 @@ const worker = new Worker('notification.tasks', async (job) => {
           html: statusTemplate.html,
           text: statusTemplate.text
         });
+        break;
+
+      case JOB_TYPES.WELCOME_EMAIL:
+        const welcomeTemplate = renderWelcomeEmail(data);
+        await sendWelcomeEmail({
+          to: data.email,
+          subject: welcomeTemplate.subject,
+          html: welcomeTemplate.html,
+          text: welcomeTemplate.text
+        });
+        break;
+
+      case JOB_TYPES.PROFILE_UPDATE_EMAIL:
+        // TODO: Implement profile update email template
+        logger.info('Profile update email not yet implemented', { userId: data.userId });
+        break;
+
+      case JOB_TYPES.ACCOUNT_DELETION_EMAIL:
+        // TODO: Implement account deletion email template
+        logger.info('Account deletion email not yet implemented', { userId: data.userId });
+        break;
+
+      case JOB_TYPES.PASSWORD_RESET_EMAIL:
+        // TODO: Implement password reset email template
+        logger.info('Password reset email not yet implemented', { userId: data.userId });
         break;
 
       default:
@@ -128,7 +153,7 @@ worker.on('completed', (job, result) => {
   });
 });
 
-worker.on('failed', (job, error) => {
+worker.on('failed', async (job, error) => {
   logger.error('Job failed', { 
     jobId: job?.id, 
     eventId: job?.data?.eventId,
@@ -137,6 +162,29 @@ worker.on('failed', (job, error) => {
     attempts: job?.attemptsMade,
     stack: error.stack
   });
+  
+  // Move to DLQ if max attempts exceeded
+  if (job && job.attemptsMade >= (job.opts.attempts || 3)) {
+    try {
+      await DLQPublisher.moveToDLQ(
+        'notification.tasks',
+        job.id.toString(),
+        job.data,
+        error.message,
+        error.message,
+        {
+          service: 'notification-service',
+          environment: process.env.NODE_ENV || 'development',
+          correlationId: job.data?.correlationId
+        }
+      );
+    } catch (dlqError) {
+      logger.error('Failed to move job to DLQ', {
+        jobId: job.id,
+        error: dlqError instanceof Error ? dlqError.message : 'Unknown error'
+      });
+    }
+  }
   
   // Send alert if critical job failed
   if (job?.data?.metadata?.priority === 'critical') {

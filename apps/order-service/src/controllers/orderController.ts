@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Joi from 'joi';
 import axios from 'axios';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import { Order } from '../models/Order';
 import { OutboxPublisher } from '../services/outboxPublisher';
 import { ok, error, logger, authMiddleware, adminMiddleware, eventPublisher, EventTypes, OrderCreatedData } from '@repo/shared';
@@ -37,13 +38,9 @@ const listOrdersSchema = Joi.object({
 });
 
 export const createOrder = async (req: Request, res: Response) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-  
   try {
     const { error: validationError } = createOrderSchema.validate(req.body);
     if (validationError) {
-      await session.abortTransaction();
       return res.status(400).json(error('VALIDATION_ERROR', validationError.details[0].message));
     }
 
@@ -55,7 +52,6 @@ export const createOrder = async (req: Request, res: Response) => {
     const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
     const userResponse = await axios.get(`${userServiceUrl}/api/users/${userId}`);
     if (!userResponse.data.success) {
-      await session.abortTransaction();
       return res.status(404).json(error('USER_NOT_FOUND', 'User not found'));
     }
 
@@ -65,26 +61,81 @@ export const createOrder = async (req: Request, res: Response) => {
     let subtotal = 0;
 
     for (const item of orderData.items) {
-      // Get product details
-      const productResponse = await axios.get(`${productServiceUrl}/api/products/${item.productId}`);
-      if (!productResponse.data.success) {
-        await session.abortTransaction();
-        return res.status(404).json(error('PRODUCT_NOT_FOUND', `Product ${item.productId} not found`));
+      try {
+        // Get product details
+        const productResponse = await axios.get(`${productServiceUrl}/api/products/${item.productId}`, {
+          timeout: 5000 // 5 second timeout
+        });
+        
+        logger.info('Product service response', { 
+          productId: item.productId, 
+          status: productResponse.status,
+          data: productResponse.data 
+        });
+        
+        if (!productResponse.data.success) {
+          return res.status(404).json(error('PRODUCT_NOT_FOUND', `Product ${item.productId} not found`));
+        }
+
+        const product = productResponse.data.data.product;
+        
+        // Validate product exists and has required fields
+        if (!product) {
+          return res.status(404).json(error('PRODUCT_NOT_FOUND', `Product ${item.productId} not found`));
+        }
+
+        // Validate product data structure
+        if (typeof product.price !== 'number' || isNaN(product.price) || product.price <= 0) {
+          logger.error('Invalid product price data', { 
+            productId: item.productId, 
+            price: product.price,
+            product: product 
+          });
+          return res.status(400).json(error('INVALID_PRODUCT_DATA', `Invalid price data for product ${item.productId}`));
+        }
+
+        // Validate required fields
+        if (!product.name || !product.sku) {
+          return res.status(400).json(error('INVALID_PRODUCT_DATA', `Missing required fields for product ${item.productId}`));
+        }
+
+        const itemTotal = product.price * item.quantity;
+        subtotal += itemTotal;
+
+        orderItems.push({
+          productId: product._id,
+          productName: product.name,
+          sku: product.sku,
+          quantity: item.quantity,
+          unitPrice: product.price,
+          totalPrice: itemTotal
+        });
+        
+        logger.info('Product added to order', { 
+          productId: item.productId, 
+          name: product.name,
+          unitPrice: product.price,
+          quantity: item.quantity,
+          totalPrice: itemTotal 
+        });
+      } catch (err) {
+        logger.error('Failed to fetch product details', { 
+          productId: item.productId, 
+          error: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : undefined
+        });
+        return res.status(503).json(error('PRODUCT_SERVICE_UNAVAILABLE', 'Product service is currently unavailable. Please try again later.'));
       }
+    }
 
-      const product = productResponse.data.data.product;
+    // Validate that we have order items
+    if (orderItems.length === 0) {
+      return res.status(400).json(error('INVALID_ORDER', 'No valid products found for order'));
+    }
 
-      const itemTotal = product.price.amount * item.quantity;
-      subtotal += itemTotal;
-
-      orderItems.push({
-        productId: product._id,
-        productName: product.name,
-        sku: product.sku,
-        quantity: item.quantity,
-        unitPrice: product.price.amount,
-        totalPrice: itemTotal
-      });
+    // Validate subtotal is valid
+    if (isNaN(subtotal) || subtotal <= 0) {
+      return res.status(400).json(error('INVALID_ORDER', 'Invalid order total calculated'));
     }
 
     // Calculate totals (simplified - no tax/shipping for now)
@@ -93,8 +144,24 @@ export const createOrder = async (req: Request, res: Response) => {
     const discount = 0;
     const total = subtotal + tax + shipping - discount;
 
+    logger.info('Order calculation', { 
+      subtotal, 
+      tax, 
+      shipping, 
+      discount, 
+      total,
+      itemCount: orderItems.length 
+    });
+
+    // Generate order number and saga ID manually
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const orderNumber = `ORD-${timestamp}-${random}`;
+    const sagaId = crypto.randomUUID();
+
     // Create order with saga fields
     const order = new Order({
+      orderNumber,
       userId,
       items: orderItems,
       pricing: {
@@ -107,7 +174,7 @@ export const createOrder = async (req: Request, res: Response) => {
       shippingAddress: orderData.shippingAddress,
       status: 'pending',
       saga: {
-        id: crypto.randomUUID(),
+        id: sagaId,
         status: 'in_progress',
         currentStep: 'order_created',
         completedSteps: [],
@@ -115,7 +182,19 @@ export const createOrder = async (req: Request, res: Response) => {
       }
     });
 
-    await order.save({ session });
+    console.log('Order object before save:', {
+      orderNumber: order.orderNumber,
+      sagaId: order.saga.id,
+      isNew: order.isNew
+    });
+
+    await order.save();
+
+    console.log('Order object after save:', {
+      orderNumber: order.orderNumber,
+      sagaId: order.saga.id,
+      _id: order._id
+    });
 
     // Create order created event
     const orderCreatedData: OrderCreatedData = {
@@ -143,14 +222,11 @@ export const createOrder = async (req: Request, res: Response) => {
       userId
     );
 
-    // Save event to outbox (within same transaction)
+    // Save event to outbox (without transaction)
     const outboxPublisher = new OutboxPublisher(null as any); // We'll initialize this properly
-    await outboxPublisher.saveEvent(session, orderCreatedEvent);
+    await outboxPublisher.saveEvent(null, orderCreatedEvent);
 
-    // Commit transaction
-    await session.commitTransaction();
-
-    // Start the saga orchestrator (async, outside transaction)
+    // Start the saga orchestrator (async)
     try {
       await sagaOrchestrator.startOrderSaga((order._id as any).toString());
     } catch (err) {
@@ -158,7 +234,7 @@ export const createOrder = async (req: Request, res: Response) => {
       // Don't fail the order creation if saga fails to start
     }
 
-    // Enqueue notification job (outside transaction)
+    // Enqueue notification job (async)
     try {
       await enqueueOrderConfirmation({
         orderId: (order._id as any).toString(),
@@ -196,11 +272,8 @@ export const createOrder = async (req: Request, res: Response) => {
       }
     }));
   } catch (err) {
-    await session.abortTransaction();
     logger.error('Create order error', { error: err });
     res.status(500).json(error('INTERNAL_ERROR', 'Failed to create order'));
-  } finally {
-    session.endSession();
   }
 };
 
