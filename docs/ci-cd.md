@@ -67,8 +67,10 @@ Configure the following secrets in your GitHub repository:
 The pipeline uses GitHub Container Registry (ghcr.io) by default. Images are tagged as:
 
 ```
-ghcr.io/your-username/ecom-microservices/service-name:tag
+ghcr.io/babascience/ecom-microservices/service-name:tag
 ```
+
+**Important**: Docker registry names must be lowercase, so `BabaScience` becomes `babascience` in image tags.
 
 ## 🚀 Deployment
 
