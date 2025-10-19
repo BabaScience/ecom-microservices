@@ -12,8 +12,6 @@ export const createRedisConnection = (): IORedis => {
     keepAlive: 30000,
     connectTimeout: 10000,
     commandTimeout: 30000,
-    retryDelayOnClusterDown: 300,
-    maxLoadingTimeout: 10000,
     enableAutoPipelining: true
   });
 };

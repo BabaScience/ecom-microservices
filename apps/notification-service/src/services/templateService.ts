@@ -3,6 +3,10 @@ import { OrderConfirmationData, OrderStatusUpdateData, EmailTemplate } from '../
 export function renderOrderConfirmationEmail(data: OrderConfirmationData): EmailTemplate {
   const { orderDetails } = data;
   
+  if (!orderDetails) {
+    throw new Error('OrderConfirmationData is missing orderDetails property');
+  }
+  
   const subject = `Order Confirmation - ${orderDetails.orderNumber}`;
   
   const html = `
@@ -92,12 +96,14 @@ export function renderOrderStatusUpdateEmail(data: OrderStatusUpdateData): Email
   const { status, orderNumber, note } = data;
   
   const statusMessages = {
-    'pending': 'Your order is being processed',
+    'pending': 'Your order is waiting for payment',
+    'payment_processing': 'Your payment is being processed',
     'confirmed': 'Your order has been confirmed',
     'processing': 'Your order is being prepared for shipment',
     'shipped': 'Your order has been shipped',
     'delivered': 'Your order has been delivered',
-    'cancelled': 'Your order has been cancelled'
+    'cancelled': 'Your order has been cancelled',
+    'failed': 'Your order processing failed'
   };
   
   const subject = `Order Update - ${orderNumber}`;

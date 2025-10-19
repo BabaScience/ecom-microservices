@@ -240,6 +240,7 @@ export const createOrder = async (req: Request, res: Response) => {
         orderId: (order._id as any).toString(),
         userId: order.userId,
         email: userResponse.data.data.user.email,
+        shippingAddress: order.shippingAddress,
         orderDetails: {
           orderNumber: order.orderNumber,
           total: order.pricing.total,

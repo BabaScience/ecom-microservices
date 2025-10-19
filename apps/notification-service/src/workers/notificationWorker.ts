@@ -25,7 +25,7 @@ const worker = new Worker('notification.tasks', async (job) => {
     jobId: job.id, 
     eventId: event.eventId,
     eventType: event.eventType,
-    orderId: event.data.data.orderId 
+    jobType: event.data.type
   });
 
   // Idempotency check
@@ -97,8 +97,7 @@ const worker = new Worker('notification.tasks', async (job) => {
     logger.info('Notification job completed successfully', { 
       jobId: job.id, 
       eventId: event.eventId,
-      type, 
-      orderId: event.data.data.orderId 
+      type
     });
 
     return { status: 'success', eventId: event.eventId };
@@ -107,8 +106,7 @@ const worker = new Worker('notification.tasks', async (job) => {
     logger.error('Notification job failed', { 
       jobId: job.id, 
       eventId: event.eventId,
-      type: event.data.type, 
-      orderId: event.data.data.orderId,
+      type: event.data.type,
       error: error instanceof Error ? error.message : 'Unknown error'
     });
     throw error;
@@ -164,7 +162,7 @@ worker.on('failed', async (job, error) => {
   });
   
   // Move to DLQ if max attempts exceeded
-  if (job && job.attemptsMade >= (job.opts.attempts || 3)) {
+  if (job && job.id && job.attemptsMade >= (job.opts.attempts || 3)) {
     try {
       await DLQPublisher.moveToDLQ(
         'notification.tasks',

@@ -12,10 +12,6 @@ const notificationQueue = new Queue('notification.tasks', {
     },
     removeOnComplete: true,
     removeOnFail: 50
-  },
-  limiter: {
-    max: 500,
-    duration: 1000
   }
 });
 
@@ -23,6 +19,13 @@ export async function enqueueOrderConfirmation(orderData: {
   orderId: string;
   userId: string;
   email: string;
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+  };
   orderDetails: {
     orderNumber: string;
     total: number;
@@ -34,11 +37,14 @@ export async function enqueueOrderConfirmation(orderData: {
     type: JOB_TYPES.ORDER_CONFIRMATION,
     data: {
       orderId: orderData.orderId,
+      userId: orderData.userId,
       email: orderData.email,
-      orderNumber: orderData.orderDetails.orderNumber,
-      total: orderData.orderDetails.total,
-      items: orderData.orderDetails.items,
-      userId: orderData.userId
+      orderDetails: {
+        orderNumber: orderData.orderDetails.orderNumber,
+        total: orderData.orderDetails.total,
+        items: orderData.orderDetails.items,
+        shippingAddress: orderData.shippingAddress
+      }
     }
   };
 
@@ -67,6 +73,7 @@ export async function enqueueOrderStatusUpdate(orderData: {
     total: number;
     items: any[];
   };
+  note?: string;
 }) {
   // Create notification task data
   const notificationData: NotificationJob = {
@@ -74,11 +81,9 @@ export async function enqueueOrderStatusUpdate(orderData: {
     data: {
       orderId: orderData.orderId,
       email: orderData.email,
+      status: orderData.status,
       orderNumber: orderData.orderDetails.orderNumber,
-      total: orderData.orderDetails.total,
-      items: orderData.orderDetails.items,
-      userId: orderData.userId,
-      status: orderData.status
+      note: orderData.note
     }
   };
 

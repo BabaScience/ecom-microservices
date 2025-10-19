@@ -1,5 +1,6 @@
 import { Queue, Job } from 'bullmq';
-import { redisConnection, logger } from '@repo/shared';
+import { redisConnection } from '../config/redis';
+import { logger } from '../utils/logger';
 
 // Initialize Dead Letter Queue
 const dlq = new Queue('dead-letter-queue', {

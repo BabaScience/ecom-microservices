@@ -13,10 +13,6 @@ const orderEventsQueue = new Queue('order.events', {
     },
     removeOnComplete: 100,
     removeOnFail: false
-  },
-  limiter: {
-    max: 1000,
-    duration: 1000
   }
 });
 
@@ -88,7 +84,8 @@ const worker = new Worker('order.events', async (job) => {
 });
 
 async function handleOrderCreated(event: DomainEvent<OrderCreatedData>) {
-  const { orderId, items } = event.data;
+  const { orderNumber, items } = event.data;
+  const orderId = event.aggregateId;
   
   logger.info('Handling order created event', { orderId, itemCount: items.length });
   
