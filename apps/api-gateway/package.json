@@ -14,8 +14,8 @@
     "helmet": "^7.1.0",
     "express-rate-limit": "^7.1.5",
     "cors": "^2.8.5",
-    "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.0",
+    "swagger-jsdoc": "^6.2.9",
+    "swagger-ui-express": "^5.0.1",
     "@repo/shared": "workspace:*"
   },
   "devDependencies": {

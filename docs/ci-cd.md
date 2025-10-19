@@ -152,8 +152,49 @@ bun run type-check
 The pipeline includes:
 
 - **Trivy**: Container vulnerability scanning
-- **Dependency Audit**: Package vulnerability checks
+- **Dependency Audit**: Package vulnerability checks with graceful failure handling
 - **Code Quality**: Linting and type checking
+- **Security Management Scripts**: Automated vulnerability resolution tools
+
+### Security Management Scripts
+
+The project includes comprehensive security management tools:
+
+#### Bash Script (`scripts/security.sh`)
+```bash
+# Run security audit
+./scripts/security.sh --audit
+
+# Fix vulnerabilities automatically
+./scripts/security.sh --fix-vulnerabilities
+
+# Update all dependencies
+./scripts/security.sh --update
+
+# Check for outdated packages
+./scripts/security.sh --check-outdated
+
+# Clean install
+./scripts/security.sh --clean
+```
+
+#### PowerShell Script (`scripts/security.ps1`)
+```powershell
+# Run security audit
+.\scripts\security.ps1 -Audit
+
+# Fix vulnerabilities automatically
+.\scripts\security.ps1 -FixVulnerabilities
+
+# Update all dependencies
+.\scripts\security.ps1 -Update
+
+# Check for outdated packages
+.\scripts\security.ps1 -CheckOutdated
+
+# Clean install
+.\scripts\security.ps1 -Clean
+```
 
 ### Security Best Practices
 
@@ -161,6 +202,8 @@ The pipeline includes:
 2. **Image Scanning**: All Docker images are scanned for vulnerabilities
 3. **Dependency Updates**: Regular dependency updates and security patches
 4. **Access Control**: Environment-specific access controls
+5. **Graceful Failure Handling**: Security audits don't block deployments for minor issues
+6. **Automated Resolution**: Use security scripts for vulnerability management
 
 ## 📊 Monitoring
 

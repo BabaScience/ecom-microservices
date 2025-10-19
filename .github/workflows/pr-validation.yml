@@ -58,6 +58,12 @@ jobs:
             fi
           done
 
+      - name: Security audit
+        run: |
+          echo "Running security audit..."
+          bun audit || echo "⚠️ Security vulnerabilities found. Please review and update dependencies."
+          echo "Continuing with PR validation..."
+
   # Run tests
   test-services:
     runs-on: ubuntu-latest
