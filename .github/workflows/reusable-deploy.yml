@@ -1,0 +1,36 @@
+# GitHub Actions Configuration
+# This file contains reusable workflows and configurations
+
+name: Reusable Workflows
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      services:
+        required: false
+        type: string
+        default: 'all'
+      skip-tests:
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      DEPLOY_TOKEN:
+        required: true
+      DATABASE_URL:
+        required: true
+      REDIS_URL:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to ${{ inputs.environment }}
+        run: |
+          echo "Deploying to ${{ inputs.environment }}"
+          echo "Services: ${{ inputs.services }}"
+          echo "Skip tests: ${{ inputs.skip-tests }}"

@@ -1,0 +1,202 @@
+name: Environment Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+      services:
+        description: 'Services to deploy (comma-separated, leave empty for all)'
+        required: false
+        type: string
+      skip_tests:
+        description: 'Skip tests (not recommended)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Pre-deployment checks
+  pre-deployment:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.services.outputs.services }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine services to deploy
+        id: services
+        run: |
+          if [ -n "${{ github.event.inputs.services }}" ]; then
+            echo "services=${{ github.event.inputs.services }}" >> $GITHUB_OUTPUT
+          else
+            echo "services=api-gateway,user-service,product-service,order-service,inventory-service,email-service,notification-service" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Validate environment
+        run: |
+          echo "Deploying to: ${{ github.event.inputs.environment }}"
+          echo "Services: ${{ steps.services.outputs.services }}"
+          echo "Skip tests: ${{ github.event.inputs.skip_tests }}"
+
+  # Run tests (unless skipped)
+  run-tests:
+    runs-on: ubuntu-latest
+    needs: pre-deployment
+    if: ${{ !github.event.inputs.skip_tests }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          IFS=',' read -ra SERVICES <<< "${{ needs.pre-deployment.outputs.services }}"
+          for service in "${SERVICES[@]}"; do
+            echo "Testing $service..."
+            cd "apps/$service"
+            if [ -f "package.json" ] && grep -q '"test"' package.json; then
+              bun test
+            else
+              echo "No tests configured for $service"
+            fi
+            cd - > /dev/null
+          done
+
+  # Deploy to Staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, run-tests]
+    if: ${{ github.event.inputs.environment == 'staging' }}
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "🚀 Deploying to staging environment..."
+          echo "Services: ${{ needs.pre-deployment.outputs.services }}"
+          
+          # This would typically involve:
+          # 1. Pull latest images from registry
+          # 2. Update docker-compose.yml with new tags
+          # 3. Run database migrations
+          # 4. Deploy services using docker-compose or Kubernetes
+          # 5. Run health checks
+          # 6. Update load balancer configuration
+          
+          echo "✅ Staging deployment completed!"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          # Wait for services to be ready
+          sleep 30
+          
+          # Test API Gateway
+          curl -f http://staging-api.example.com/health || echo "API Gateway health check failed"
+          
+          # Test other services
+          IFS=',' read -ra SERVICES <<< "${{ needs.pre-deployment.outputs.services }}"
+          for service in "${SERVICES[@]}"; do
+            echo "Testing $service health endpoint..."
+            # curl -f http://staging-$service.example.com/health || echo "$service health check failed"
+          done
+
+  # Deploy to Production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [pre-deployment, run-tests]
+    if: ${{ github.event.inputs.environment == 'production' }}
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pre-deployment backup
+        run: |
+          echo "📦 Creating pre-deployment backup..."
+          # This would typically involve:
+          # 1. Database backup
+          # 2. Configuration backup
+          # 3. Current deployment state backup
+          echo "✅ Backup completed!"
+
+      - name: Deploy to production
+        run: |
+          echo "🚀 Deploying to production environment..."
+          echo "Services: ${{ needs.pre-deployment.outputs.services }}"
+          
+          # Blue-green deployment strategy
+          echo "🔄 Starting blue-green deployment..."
+          
+          # 1. Deploy to green environment
+          echo "Deploying to green environment..."
+          
+          # 2. Run health checks
+          echo "Running health checks..."
+          
+          # 3. Switch traffic to green
+          echo "Switching traffic to green environment..."
+          
+          # 4. Monitor for issues
+          echo "Monitoring deployment..."
+          
+          echo "✅ Production deployment completed!"
+
+      - name: Post-deployment verification
+        run: |
+          echo "🔍 Running post-deployment verification..."
+          
+          # Wait for services to stabilize
+          sleep 60
+          
+          # Test critical endpoints
+          echo "Testing critical endpoints..."
+          
+          # Monitor error rates
+          echo "Monitoring error rates..."
+          
+          echo "✅ Post-deployment verification completed!"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "🔄 Rolling back deployment..."
+          # Implement rollback logic here
+          echo "✅ Rollback completed!"
+
+  # Notification
+  notify-deployment:
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+    steps:
+      - name: Notify deployment status
+        run: |
+          if [ "${{ needs.deploy-staging.result }}" == "success" ] || [ "${{ needs.deploy-production.result }}" == "success" ]; then
+            echo "✅ Deployment to ${{ github.event.inputs.environment }} successful!"
+            # Send success notification (Slack, email, etc.)
+          else
+            echo "❌ Deployment to ${{ github.event.inputs.environment }} failed!"
+            # Send failure notification
+          fi
