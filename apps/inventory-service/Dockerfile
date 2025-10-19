@@ -1,24 +1,18 @@
-FROM oven/bun:1 as base
+FROM oven/bun:1
+
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lockb* ./
-RUN bun install --frozen-lockfile
+# Copy shared package first
+COPY packages/shared ./packages/shared
 
-# Copy source code
-COPY . .
+# Copy service files
+COPY apps/inventory-service .
 
-# Build the application
-RUN bun run build
+# Modify package.json to use local path for shared package
+RUN sed -i 's/"@repo\/shared": "workspace:\*"/"@repo\/shared": "file:.\/packages\/shared"/' package.json
 
-# Production stage
-FROM oven/bun:1-slim
-WORKDIR /app
-
-# Copy built application
-COPY --from=base /app/dist ./dist
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/package.json ./package.json
+# Install dependencies directly in service directory
+RUN bun install
 
 # Expose port
 EXPOSE 3005
@@ -27,5 +21,5 @@ EXPOSE 3005
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3005/health || exit 1
 
-# Start the application
-CMD ["bun", "run", "start"]
+# Start application directly from TypeScript
+CMD ["bun", "run", "src/index.ts"]

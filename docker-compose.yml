@@ -24,7 +24,9 @@ services:
 
   # Application Services
   api-gateway:
-    build: ./apps/api-gateway
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile
     container_name: ecommerce-gateway
     ports:
       - "3000:3000"
@@ -51,7 +53,9 @@ services:
       start_period: 40s
 
   user-service:
-    build: ./apps/user-service
+    build:
+      context: .
+      dockerfile: ./apps/user-service/Dockerfile
     container_name: ecommerce-user-service
     ports:
       - "3001:3001"
@@ -73,7 +77,9 @@ services:
       start_period: 40s
 
   product-service:
-    build: ./apps/product-service
+    build:
+      context: .
+      dockerfile: ./apps/product-service/Dockerfile
     container_name: ecommerce-product-service
     ports:
       - "3002:3002"
@@ -93,7 +99,9 @@ services:
       start_period: 40s
 
   order-service:
-    build: ./apps/order-service
+    build:
+      context: .
+      dockerfile: ./apps/order-service/Dockerfile
     container_name: ecommerce-order-service
     ports:
       - "3003:3003"
@@ -120,7 +128,9 @@ services:
       start_period: 40s
 
   inventory-service:
-    build: ./apps/inventory-service
+    build:
+      context: .
+      dockerfile: ./apps/inventory-service/Dockerfile
     ports:
       - "3005:3005"
     environment:
@@ -142,11 +152,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:
-      replicas: 2
 
   email-service:
-    build: ./apps/email-service
+    build:
+      context: .
+      dockerfile: ./apps/email-service/Dockerfile
     container_name: ecommerce-email-service
     ports:
       - "3006:3006"
@@ -169,7 +179,9 @@ services:
       start_period: 40s
 
   notification-service:
-    build: ./apps/notification-service
+    build:
+      context: .
+      dockerfile: ./apps/notification-service/Dockerfile
     ports:
       - "3004:3004"
     environment:
@@ -191,8 +203,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    deploy:
-      replicas: 3
 
 volumes:
   mongodb_data:
